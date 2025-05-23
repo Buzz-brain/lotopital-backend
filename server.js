@@ -985,7 +985,7 @@ app.post('/api/send-email', async (req, res) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: 'thelotopital@gmail.com',
-    subject: `New message from ${name}`,
+    subject: `New Message From ${name}`,
     text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nService: ${service}\nMessage: ${message}`,
   };
   transporter.sendMail(mailOptions, (error, info) => {
