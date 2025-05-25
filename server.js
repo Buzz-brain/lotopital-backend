@@ -401,7 +401,7 @@ app.post("/api/admin-logout", limiter, authenticate, (req, res) => {
 });
 
 // Forgot Password Endpoint - Connected
-app.post("/api/forgot-password", async (req, res) => {
+app.post("/api/forgot-password", limiter, async (req, res) => {
   try {
     await forgotPasswordSchema.validateAsync(req.body);
   } catch (error) {
@@ -458,7 +458,7 @@ app.post("/api/forgot-password", async (req, res) => {
 });
 
 // Reset Password Endpoint - Connected
-app.post("/api/reset-password/:token", async (req, res) => {
+app.post("/api/reset-password/:token", limiter, async (req, res) => {
   try {
     await resetPasswordSchema.validateAsync(req.body);
   } catch (error) {
@@ -489,7 +489,7 @@ app.post("/api/reset-password/:token", async (req, res) => {
 
     res.status(200).json({ message: "Password reset successful" });
   } catch (error) {
-    console.log(error);
+    console.log(error.message);
     res.status(500).json({ message: "Error resetting password" });
   }
 });
@@ -566,7 +566,7 @@ app.post('/api/send-email', limiter, async (req, res) => {
   console.log("req.body", req.body)
   const mailOptions = {
     from: process.env.EMAIL_USER,
-    to: process.env.CONTACT_EMAIL,
+    to: process.env.EMAIL_USER,
     subject: `New Message From ${name}`,
     text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nService: ${service}\nMessage: ${message}`,
   };
