@@ -131,26 +131,24 @@ const limiter = rateLimit({
 
 // Validation Schemas
 const registerSchema = Joi.object({
-  username: Joi.string().required().trim().min(3).messages({
-    "string.empty": "Username is required",
-    "string.min": "Username must contain at least 3 characters",
-    "any.required": "Username is required",
+  name: Joi.string().required().trim().min(3).messages({
+    "string.empty": "Name is required",
+    "string.min": "Name must contain at least 3 characters",
+    "any.required": "Name is required",
   }),
   email: Joi.string().email().required().trim().messages({
     "string.empty": "Email is required",
     "string.email": "Invalid email format",
     "any.required": "Email is required",
   }),
-  password: Joi.string().required().trim().min(4).max(8).messages({
+  password: Joi.string().required().trim().min(6).max(8).messages({
     "string.empty": "Password is required",
-    "string.min": "Password must contain at least 4 characters",
+    "string.min": "Password must contain at least 6 characters",
     "string.max": "Password must not exceed 8 characters",
     "any.required": "Password is required",
   }),
-  terms: Joi.boolean().required().valid(true).messages({
-    "boolean.base": "You must agree to the terms and conditions",
-    "any.required": "You must agree to the terms and conditions",
-    "any.valid": "You must agree to the terms and conditions",
+  confirmPassword: Joi.any().valid(Joi.ref('password')).required().messages({
+    'any.only': 'Passwords do not match',
   }),
 });
 
@@ -232,8 +230,8 @@ const contactSchema = Joi.object({
 
 // ADMIN AUTHENTICATION
 
-// Admin Register End point - Connected ( Not done - CAPTCHA )
-app.post("/admin-register", limiter, async (req, res) => {
+// Admin Register End point - Connected
+app.post("/api/admin-register", limiter, async (req, res) => {
   // Validation check
   try {
     await registerSchema.validateAsync(req.body);
@@ -243,20 +241,15 @@ app.post("/admin-register", limiter, async (req, res) => {
     });
   }
 
-  const { username, email, password, terms } = req.body;
+  const { name, email, password } = req.body;
 
-  // Check terms and conditions
-  if (!terms) {
-    return res.status(400).json({
-      message: "You must agree to the terms and conditions",
-    });
-  }
+  console.log(req.body)
 
-  // Username uniqueness check
-  const existingUsername = await Admin.findOne({ username });
-  if (existingUsername) {
+  // Name uniqueness check
+  const existingName = await Admin.findOne({ name });
+  if (existingName) {
     return res.status(400).json({
-      message: "Username already taken",
+      message: "Name already taken",
     });
   }
 
@@ -273,7 +266,7 @@ app.post("/admin-register", limiter, async (req, res) => {
 
   // Save admin info to database
   const admin = new Admin({
-    username,
+    name,
     email,
     password: hash,
     role: "admin",
@@ -293,7 +286,7 @@ app.post("/admin-register", limiter, async (req, res) => {
       from: process.env.EMAIL_USER,
       to: admin.email,
       subject: "Verify your email",
-      text: `Verify your email by clicking this link: http://localhost:3000/verify-email/${verificationToken}`,
+      text: `Verify your email by clicking this link: http://localhost:5173/verify-email/${verificationToken}`,
     };
 
     transporter.sendMail(mailOptions, async (error, info) => {
@@ -537,6 +530,101 @@ app.post("/resend-verification", verifyTokenMiddleware, async (req, res) => {
     res.status(500).json({ message: "Error processing request" });
   }
 });
+
+
+// Contact us send to mail
+app.post('/api/send-email', limiter, async (req, res) => {
+  // Validation check
+  try {
+    await contactSchema.validateAsync(req.body);
+  } catch (error) {
+    return res.status(400).json({
+      message: error.details[0].message,
+    });
+  }
+
+  const { name, email, phone, company, message, service } = req.body;
+  console.log("req.body", req.body)
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.CONTACT_EMAIL,
+    subject: `New Message From ${name}`,
+    text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nService: ${service}\nMessage: ${message}`,
+  };
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('Error sending email:', error);
+      res.status(500).send('Error sending email');
+    } else {
+      res.send('Email sent successfully');
+    }
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ADMIN CRUD OPERATION
 
@@ -967,36 +1055,5 @@ app.get("/posts/:postId/comments", async (req, res) => {
     res.status(500).json({ message: "Error getting comments" });
   }
 });
-
-
-// Contact us send to mail
-app.post('/api/send-email', async (req, res) => {
-  // Validation check
-  try {
-    await contactSchema.validateAsync(req.body);
-  } catch (error) {
-    return res.status(400).json({
-      message: error.details[0].message,
-    });
-  }
-
-  const { name, email, phone, company, message, service } = req.body;
-  console.log("req.body", req.body)
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: 'thelotopital@gmail.com',
-    subject: `New Message From ${name}`,
-    text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nCompany: ${company}\nService: ${service}\nMessage: ${message}`,
-  };
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.error('Error sending email:', error);
-      res.status(500).send('Error sending email');
-    } else {
-      res.send('Email sent successfully');
-    }
-  });
-});
-
 
 app.listen(3000, () => console.log("Server running on http://localhost:3000"));
