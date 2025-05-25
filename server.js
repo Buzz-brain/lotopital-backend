@@ -311,7 +311,7 @@ app.post("/api/admin-register", limiter, async (req, res) => {
 });
 
 // Verify Email End point - Connected
-app.get("/api/verify-email/:token", async (req, res) => {
+app.get("/api/verify-email/:token", limiter, async (req, res) => {
   try {
     const token = req.params.token;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -323,7 +323,7 @@ app.get("/api/verify-email/:token", async (req, res) => {
     await admin.save();
     res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
-    console.log(error.messageyy);
+    console.log(error.message);
     res.status(400).json({ message: "Invalid or expired token" });
   }
 });
@@ -386,7 +386,7 @@ app.post("/api/admin-login", limiter, async (req, res) => {
 });
 
 // Admin Logout End point - Connected
-app.post("/api/admin-logout", authenticate, (req, res) => {
+app.post("/api/admin-logout", limiter, authenticate, (req, res) => {
   try {
     res.clearCookie("token", {
       httpOnly: true,
@@ -399,6 +399,21 @@ app.post("/api/admin-logout", authenticate, (req, res) => {
     res.status(500).json({ message: "Failed to log out" });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Forgot Password Endpoint - Connected
 app.post("/forgot-password", async (req, res) => {
