@@ -286,7 +286,7 @@ app.post("/api/admin-register", limiter, async (req, res) => {
       from: process.env.EMAIL_USER,
       to: admin.email,
       subject: "Verify your email",
-      text: `Verify your email by clicking this link: http://localhost:5173/verify-email/${verificationToken}`,
+      text: `Verify your email by clicking this link: ${process.env.FRONTEND}/admin/verify-email/${verificationToken}`,
     };
 
     transporter.sendMail(mailOptions, async (error, info) => {
@@ -300,8 +300,7 @@ app.post("/api/admin-register", limiter, async (req, res) => {
       } else {
         console.log("Email sent: " + info.response);
         res.status(200).json({
-          message: "Registration successful, please verify your email",
-          redirect: `/resend-verification/${admin._id}`,
+          message: "Registration successful! Please check your email inbox to verify your account."
         });
       }
     });
@@ -391,7 +390,7 @@ app.get("/api/verify-email/:token", async (req, res) => {
     await admin.save();
     res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
-    console.log(error);
+    console.log(error.messageyy);
     res.status(400).json({ message: "Invalid or expired token" });
   }
 });
