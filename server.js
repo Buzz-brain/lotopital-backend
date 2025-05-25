@@ -173,9 +173,9 @@ const forgotPasswordSchema = Joi.object({
 });
 
 const resetPasswordSchema = Joi.object({
-  password: Joi.string().required().trim().min(4).max(8).messages({
+  password: Joi.string().required().trim().min(6).max(8).messages({
     "string.empty": "Password is required",
-    "string.min": "Password must contain at least 4 characters",
+    "string.min": "Password must contain at least 6 characters",
     "string.max": "Password must not exceed 8 characters",
     "any.required": "Password is required",
   }),
@@ -400,23 +400,8 @@ app.post("/api/admin-logout", limiter, authenticate, (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Forgot Password Endpoint - Connected
-app.post("/forgot-password", async (req, res) => {
+app.post("/api/forgot-password", async (req, res) => {
   try {
     await forgotPasswordSchema.validateAsync(req.body);
   } catch (error) {
@@ -456,7 +441,7 @@ app.post("/forgot-password", async (req, res) => {
       from: process.env.EMAIL_USER,
       to: admin.email,
       subject: "Password Reset",
-      text: `Reset your password by clicking this link: http://localhost:3000/reset-password/${resetToken}`,
+      text: `Reset your password by clicking this link: ${process.env.FRONTEND}/admin/reset-password/${resetToken}`,
     };
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
@@ -473,7 +458,7 @@ app.post("/forgot-password", async (req, res) => {
 });
 
 // Reset Password Endpoint - Connected
-app.post("/reset-password/:token", async (req, res) => {
+app.post("/api/reset-password/:token", async (req, res) => {
   try {
     await resetPasswordSchema.validateAsync(req.body);
   } catch (error) {
@@ -508,6 +493,21 @@ app.post("/reset-password/:token", async (req, res) => {
     res.status(500).json({ message: "Error resetting password" });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Resend Verification Endpoint - Connected
 app.post("/resend-verification", verifyTokenMiddleware, async (req, res) => {
