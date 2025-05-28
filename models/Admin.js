@@ -25,6 +25,10 @@ const adminSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  lastVerificationSent: {
+    type: Date,
+    default: null,
+  },
   verificationFailed: Boolean,
   resetToken: String,
   resetTokenExpiration: Date,

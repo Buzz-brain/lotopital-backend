@@ -22,9 +22,7 @@ app.use(cookieParser());
 app.use(express.static(__dirname + "/../Frontend"));
 
 // CORS Configuration
-const allowedOrigins = [
-  process.env.FRONTEND,
-];
+const allowedOrigins = [ process.env.FRONTEND ];
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -117,7 +115,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 2 * 60 * 1000, // 2 minutes
@@ -181,25 +178,6 @@ const resetPasswordSchema = Joi.object({
   }),
 });
 
-const categorySchema = Joi.object({
-  name: Joi.string().required().trim().messages({
-    "string.empty": "Category name is required",
-    "any.required": "Category name is required",
-  }),
-  description: Joi.string().allow("").optional().trim(),
-});
-
-const postSchema = Joi.object({
-  primaryImage: Joi.string().required(),
-  images: Joi.array().items(Joi.string()),
-  title: Joi.string().required(),
-  category: Joi.string().required(),
-  content: Joi.string().required(),
-  description: Joi.string().required(),
-  tag: Joi.array().items(Joi.string().required()).min(1).required(),
-  videos: Joi.array().items(Joi.string()),
-});
-
 const contactSchema = Joi.object({
   name: Joi.string().required().trim().min(3).messages({
     "string.empty": "Name is required",
@@ -225,6 +203,29 @@ const contactSchema = Joi.object({
     "string.min": "Message must contain at least 10 characters",
     "any.required": "Message is required",
   }),
+});
+
+
+
+
+
+const categorySchema = Joi.object({
+  name: Joi.string().required().trim().messages({
+    "string.empty": "Category name is required",
+    "any.required": "Category name is required",
+  }),
+  description: Joi.string().allow("").optional().trim(),
+});
+
+const postSchema = Joi.object({
+  primaryImage: Joi.string().required(),
+  images: Joi.array().items(Joi.string()),
+  title: Joi.string().required(),
+  category: Joi.string().required(),
+  content: Joi.string().required(),
+  description: Joi.string().required(),
+  tag: Joi.array().items(Joi.string().required()).min(1).required(),
+  videos: Joi.array().items(Joi.string()),
 });
 
 
@@ -494,23 +495,22 @@ app.post("/api/reset-password/:token", limiter, async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+app.get("/api/get-admin-email", async (req, res) => {
+  try {
+    const verificationToken = req.cookies.verificationToken;
+    const decodedToken = jwt.verify(verificationToken, process.env.JWT_SECRET);
+    if (decodedToken.purpose !== "resend-verification") {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+    res.json({ email: decodedToken.email });
+  } catch (error) {
+    console.log(error);
+    res.status(401).json({ message: "Invalid token" });
+  }
+});
 
 // Resend Verification Endpoint - Connected
-app.post("/resend-verification", verifyTokenMiddleware, async (req, res) => {
+app.post("/api/resend-verification", verifyTokenMiddleware, async (req, res) => {
   try {
     const admin = await Admin.findById(req.adminId);
     if (!admin) {
@@ -521,24 +521,42 @@ app.post("/resend-verification", verifyTokenMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Email already verified" });
     }
 
+    const COOLDOWN_SECONDS = 60;
+
+    // Check if cooldown period has passed
+    const now = new Date();
+    if (admin.lastVerificationSent) {
+      const secondsSinceLastSend = (now - admin.lastVerificationSent) / 1000;
+      const remainingTime = Math.ceil(COOLDOWN_SECONDS - secondsSinceLastSend);
+      if (secondsSinceLastSend < COOLDOWN_SECONDS) {
+        return res.status(429).json({
+          message: `Please wait ${remainingTime} seconds before resending verification email.`,
+          cooldown: remainingTime,
+        });
+      }
+    }
+
     const verifyToken = jwt.sign(
       { adminId: admin._id },
       process.env.JWT_SECRET,
-      {
-        expiresIn: "1h",
-      }
+      { expiresIn: "1h" }
     );
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: admin.email,
       subject: "Verify your email",
-      text: `Verify your email by clicking this link: http://localhost:3000/verify-email/${verifyToken}`,
+      text: `Verify your email by clicking this link: ${process.env.FRONTEND}/admin/verify-email/${verifyToken}`,
     };
 
     try {
       const info = await transporter.sendMail(mailOptions);
       console.log("Email sent: " + info.response);
+
+      // Save the current time to enforce cooldown
+      admin.lastVerificationSent = now;
+      await admin.save();
+
       res.status(200).json({ message: "Email Verification sent" });
     } catch (error) {
       console.log(error);
@@ -549,7 +567,6 @@ app.post("/resend-verification", verifyTokenMiddleware, async (req, res) => {
     res.status(500).json({ message: "Error processing request" });
   }
 });
-
 
 // Contact us send to mail
 app.post('/api/send-email', limiter, async (req, res) => {
