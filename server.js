@@ -205,27 +205,12 @@ const contactSchema = Joi.object({
   }),
 });
 
-
-
-
-
 const categorySchema = Joi.object({
   name: Joi.string().required().trim().messages({
     "string.empty": "Category name is required",
     "any.required": "Category name is required",
   }),
   description: Joi.string().allow("").optional().trim(),
-});
-
-const postSchema = Joi.object({
-  primaryImage: Joi.string().required(),
-  images: Joi.array().items(Joi.string()),
-  title: Joi.string().required(),
-  category: Joi.string().required(),
-  content: Joi.string().required(),
-  description: Joi.string().required(),
-  tag: Joi.array().items(Joi.string().required()).min(1).required(),
-  videos: Joi.array().items(Joi.string()),
 });
 
 
@@ -597,103 +582,26 @@ app.post('/api/send-email', limiter, async (req, res) => {
   });
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ADMIN CRUD OPERATION
-
-// Delete All Admins from Database End point - Tested
-app.delete("/admins", async (req, res) => {
+// Get User Details Endpoint
+app.get("/api/get-user-details", authenticate, async (req, res) => {
   try {
-    await Admin.deleteMany({});
-    res.status(200).json({ message: "All admins deleted successfully" });
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { name, email, role } = req.user;
+    res.status(200).json({ name, email, role });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error deleting admins" });
+    console.error("Failed to get user details:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Get All Admins from Database End point - Tested
-app.get("/admins", async (req, res) => {
-  try {
-    const admins = await Admin.find().select("-password");
-    res.status(200).json(admins);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error fetching admins" });
-  }
-});
 
 // CATEGORY CRUD OPERATION
 
 // Create Category (admin only) - Connected
-app.post(
-  "/category",
-  authenticate,
-  checkPermission("create"),
-  async (req, res) => {
+app.post( "/api/category", authenticate, checkPermission("create"), async (req, res) => {
     try {
       await categorySchema.validateAsync(req.body);
     } catch (error) {
@@ -715,6 +623,7 @@ app.post(
       }
       const category = new Category(categoryData);
       await category.save();
+      console.log(category)
       res.status(201).json({ message: "Category created successfully" });
     } catch (error) {
       console.log(error);
@@ -724,7 +633,7 @@ app.post(
 );
 
 // Get Category (admin and user) - Connected
-app.get("/category", async (req, res) => {
+app.get("/api/category", async (req, res) => {
     try {
       const categories = await Category.find();
       res.status(200).json(categories);
@@ -736,11 +645,7 @@ app.get("/category", async (req, res) => {
 );
 
 // Delete Category (admin only) - Connected
-app.delete(
-  "/category/:id",
-  authenticate,
-  checkPermission("delete"),
-  async (req, res) => {
+app.delete( "/api/category/:id", authenticate, checkPermission("delete"), async (req, res) => {
     try {
       const categoryId = req.params.id;
       const category = await Category.findByIdAndDelete(categoryId);
@@ -756,11 +661,7 @@ app.delete(
 );
 
 // Update Category (admin only) - Connected
-app.put(
-  "/category/:id",
-  authenticate,
-  checkPermission("update"),
-  async (req, res) => {
+app.put( "/api/category/:id", authenticate, checkPermission("update"), async (req, res) => {
     try {
       await categorySchema.validateAsync(req.body);
     } catch (error) {
@@ -803,6 +704,82 @@ app.put(
     }
   }
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const postSchema = Joi.object({
+  primaryImage: Joi.string().required(),
+  images: Joi.array().items(Joi.string()),
+  title: Joi.string().required(),
+  category: Joi.string().required(),
+  content: Joi.string().required(),
+  description: Joi.string().required(),
+  tag: Joi.array().items(Joi.string().required()).min(1).required(),
+  videos: Joi.array().items(Joi.string()),
+});
 
 // POST CRUD OPERATION
 
@@ -1089,6 +1066,34 @@ app.get("/posts/:postId/comments", async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error getting comments" });
+  }
+});
+
+
+
+
+
+// ADMIN CRUD OPERATION
+
+// Delete All Admins from Database End point - Tested
+app.delete("/admins", async (req, res) => {
+  try {
+    await Admin.deleteMany({});
+    res.status(200).json({ message: "All admins deleted successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error deleting admins" });
+  }
+});
+
+// Get All Admins from Database End point - Tested
+app.get("/admins", async (req, res) => {
+  try {
+    const admins = await Admin.find().select("-password");
+    res.status(200).json(admins);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error fetching admins" });
   }
 });
 
