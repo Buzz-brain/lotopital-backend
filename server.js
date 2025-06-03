@@ -213,6 +213,17 @@ const categorySchema = Joi.object({
   description: Joi.string().allow("").optional().trim(),
 });
 
+const postSchema = Joi.object({
+  primaryImage: Joi.string().required(),
+  images: Joi.array().items(Joi.string()),
+  title: Joi.string().required(),
+  category: Joi.string().required(),
+  content: Joi.string().required(),
+  excerpt: Joi.string().required(),
+  tag: Joi.array().items(Joi.string().required()).min(1).required(),
+  isTrending: Joi.boolean().default(false)
+});
+
 
 // ADMIN AUTHENTICATION
 
@@ -623,7 +634,6 @@ app.post( "/api/category", authenticate, checkPermission("create"), async (req, 
       }
       const category = new Category(categoryData);
       await category.save();
-      console.log(category)
       res.status(201).json({ message: "Category created successfully" });
     } catch (error) {
       console.log(error);
@@ -707,84 +717,10 @@ app.put( "/api/category/:id", authenticate, checkPermission("update"), async (re
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const postSchema = Joi.object({
-  primaryImage: Joi.string().required(),
-  images: Joi.array().items(Joi.string()),
-  title: Joi.string().required(),
-  category: Joi.string().required(),
-  content: Joi.string().required(),
-  description: Joi.string().required(),
-  tag: Joi.array().items(Joi.string().required()).min(1).required(),
-  videos: Joi.array().items(Joi.string()),
-});
-
 // POST CRUD OPERATION
 
 // Create post (admin only) - Connected
-app.post("/post", authenticate, checkPermission("create"), async (req, res) => {
+app.post("/api/post", authenticate, checkPermission("create"), async (req, res) => {
   try {
     await postSchema.validateAsync(req.body);
   } catch (error) {
@@ -802,6 +738,8 @@ app.post("/post", authenticate, checkPermission("create"), async (req, res) => {
       return res.status(400).json({ message: "Category not found" });
     }
 
+    console.log(req.body)
+
     delete req.body.postedBy; // Delete postedBy field from request body
     const postData = new Post(req.body);
     await postData.save();
@@ -816,9 +754,10 @@ app.post("/post", authenticate, checkPermission("create"), async (req, res) => {
 });
 
 // View All Posts (admin and user) - Connected
-app.get("/post", async (req, res) => {
+app.get("/api/post", async (req, res) => {
   try {
     const posts = await Post.find().populate("category");
+    console.log(posts)
     res.status(200).json(posts);
   } catch (error) {
     console.log(error);
@@ -826,31 +765,8 @@ app.get("/post", async (req, res) => {
   }
 });
 
-// View Post by ID (admin and user) - Connected
-app.get("/post/:id", async (req, res) => {
-  try {
-    const postId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(postId)) {
-      return res.status(400).json({ message: "Invalid post ID" });
-    }
-
-    const postData = await Post.findById(postId).populate("category");
-    if (!postData) {
-      return res.status(404).json({ message: "Post not found" });
-    }
-
-    res.status(200).json(postData);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error fetching post" });
-  }
-});
-
 // Update Post (admin only) - Connected
-app.put(
-  "/post/:id",
-  authenticate,
-  checkPermission("update"),
+app.put( "/api/post/:id", authenticate, checkPermission("update"),
   async (req, res) => {
     try {
       const postId = req.params.id;
@@ -883,11 +799,7 @@ app.put(
 );
 
 // Delete Post (admin only) - Connected
-app.delete(
-  "/post/:id",
-  authenticate,
-  checkPermission("delete"),
-  async (req, res) => {
+app.delete( "/api/post/:id", authenticate, checkPermission("delete"), async (req, res) => {
     try {
       const postId = req.params.id;
       if (!mongoose.Types.ObjectId.isValid(postId)) {
@@ -909,109 +821,126 @@ app.delete(
 
 // SEARCH FUNCTIONALITY
 
-// Search Posts (admin and user) - Connected
-app.get("/search/posts", async (req, res) => {
-    try {
-      const query = req.query.q;
-      const page = 1;
-      const limit = 10;
-      if (!query) {
-        return res.status(400).json({ message: "Search query is required" });
-      }
-
-      const regex = new RegExp(query, "i");
-      const posts = await Post.find({
-        $or: [
-          { title: regex },
-          { description: regex },
-          { content: regex },
-          { tag: regex },
-        ],
-      })
-        .populate("category")
-        .skip((page - 1) * limit)
-        .limit(limit);
-      const totalPosts = await Post.countDocuments({
-        $or: [
-          { title: regex },
-          { description: regex },
-          { content: regex },
-          { tag: regex },
-        ],
-      });
-      const totalPages = Math.ceil(totalPosts / limit);
-      res.status(200).json({
-        posts,
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalPosts,
-        },
-      });
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Error searching posts" });
-    }
-  }
-);
-
-// Filter Posts by Category (admin and user) - Connected
-app.get("/posts/filter", async (req, res) => {
-    try {
-      const categoryId = req.query.category;
-      const page = 1;
-      const limit = 10;
-      if (!categoryId) {
-        return res.status(400).json({ message: "Category ID is required" });
-      }
-
-      const posts = await Post.find({ category: categoryId })
-        .populate("category")
-        .populate("category")
-        .skip((page - 1) * limit)
-        .limit(limit);
-      const totalPosts = await Post.countDocuments({ category: categoryId });
-      const totalPages = Math.ceil(totalPosts / limit);
-      res.status(200).json({
-        posts,
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalPosts,
-        },
-      });
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Error filtering posts" });
-    }
-  }
-);
-
-// Paginate Posts (admin and user) - Connected
-app.get("/posts", async (req, res) => {
+// Search Posts, Filter Posts by Category (admin and user) - Connected
+app.get("/api/posts/search-filter", async (req, res) => {
   try {
-    const page = req.query.page || 1;
-    const limit = 5; // Should be 10
+    const { q, category, page = 1 } = req.query;
+    const limit = 5;
+    const filter = {};
 
-    const posts = await Post.find()
+    if (q) {
+      const regex = new RegExp(q, "i");
+      filter.$or = [
+        { title: regex },
+        { excerpt: regex },
+        { content: regex },
+        { tag: regex },
+      ];
+    }
+
+    if (category) {
+      filter.category = category;
+    }
+
+    const posts = await Post.find(filter)
       .populate("category")
       .skip((page - 1) * limit)
       .limit(limit);
 
-    const totalPosts = await Post.countDocuments();
+    const totalPosts = await Post.countDocuments(filter);
     const totalPages = Math.ceil(totalPosts / limit);
 
     res.status(200).json({
       posts,
       pagination: {
-        currentPage: page,
+        currentPage: Number(page),
         totalPages,
         totalPosts,
       },
     });
   } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error fetching filtered posts" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// View Post by ID (admin and user) - Connected
+app.get("/api/post/:id", async (req, res) => {
+  try {
+    const postId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+
+    const postData = await Post.findById(postId).populate("category");
+    if (!postData) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.status(200).json(postData);
+  } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Error fetching posts" });
+    res.status(500).json({ message: "Error fetching post" });
   }
 });
 

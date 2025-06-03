@@ -11,7 +11,7 @@ const postSchema = new mongoose.Schema(
       required: true,
     },
     content: { type: String, required: true },
-    description: { type: String, required: true },
+    excerpt: { type: String, required: true },
     tag: {
       type: [{ type: String }],
       validate: {
@@ -22,7 +22,10 @@ const postSchema = new mongoose.Schema(
       }
     },   
     postedBy: { type: String, default: "Admin" },
-    videos: [{ type: String }],
+    isTrending: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
