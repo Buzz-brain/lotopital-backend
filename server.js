@@ -13,6 +13,7 @@ const Admin = require("./models/Admin");
 const Category = require("./models/Category");
 const Post = require("./models/Post");
 const Comment = require("./models/Comment");
+const Message = require('./models/Message');
 
 require("dotenv").config();
 
@@ -576,7 +577,14 @@ app.post('/api/send-email', limiter, async (req, res) => {
   }
 
   const { name, email, phone, company, message, service } = req.body;
-  console.log("req.body", req.body)
+
+  // Save message to DB
+  try {
+    await Message.create({ name, email, phone, company, message, service });
+  } catch (error) {
+    console.error("Error saving message to database:", error);
+  }
+
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: process.env.EMAIL_USER,
@@ -592,6 +600,17 @@ app.post('/api/send-email', limiter, async (req, res) => {
     }
   });
 });
+
+app.get('/api/messages', async (req, res) => {
+  try {
+    const messages = await Message.find().sort({ createdAt: -1 });
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    res.status(500).json({ message: 'Error fetching messages' });
+  }
+});
+
 
 // Get User Details Endpoint
 app.get("/api/get-user-details", authenticate, async (req, res) => {
@@ -765,6 +784,26 @@ app.get("/api/post", async (req, res) => {
   }
 });
 
+// View Post by ID (admin and user) - Connected
+app.get("/api/post/:id", async (req, res) => {
+  try {
+    const postId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+
+    const postData = await Post.findById(postId).populate("category");
+    if (!postData) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.status(200).json(postData);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error fetching post" });
+  }
+});
+
 // Update Post (admin only) - Connected
 app.put( "/api/post/:id", authenticate, checkPermission("update"),
   async (req, res) => {
@@ -825,7 +864,7 @@ app.delete( "/api/post/:id", authenticate, checkPermission("delete"), async (req
 app.get("/api/posts/search-filter", async (req, res) => {
   try {
     const { q, category, page = 1 } = req.query;
-    const limit = 5;
+    const limit = 10000;
     const filter = {};
 
     if (q) {
@@ -924,25 +963,7 @@ app.get("/api/posts/search-filter", async (req, res) => {
 
 
 
-// View Post by ID (admin and user) - Connected
-app.get("/api/post/:id", async (req, res) => {
-  try {
-    const postId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(postId)) {
-      return res.status(400).json({ message: "Invalid post ID" });
-    }
 
-    const postData = await Post.findById(postId).populate("category");
-    if (!postData) {
-      return res.status(404).json({ message: "Post not found" });
-    }
-
-    res.status(200).json(postData);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error fetching post" });
-  }
-});
 
 // COMMENT AND REPLY FUNCTIONALITY
 
@@ -997,9 +1018,6 @@ app.get("/posts/:postId/comments", async (req, res) => {
     res.status(500).json({ message: "Error getting comments" });
   }
 });
-
-
-
 
 
 // ADMIN CRUD OPERATION
