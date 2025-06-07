@@ -7,13 +7,14 @@ const Joi = require("joi");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const nodemailer = require("nodemailer");
-const cors = require('cors');``
+const cors = require("cors");
+``;
 
 const Admin = require("./models/Admin");
 const Category = require("./models/Category");
 const Post = require("./models/Post");
 const Comment = require("./models/Comment");
-const Message = require('./models/Message');
+const Message = require("./models/Message");
 
 require("dotenv").config();
 
@@ -23,7 +24,7 @@ app.use(cookieParser());
 app.use(express.static(__dirname + "/../Frontend"));
 
 // CORS Configuration
-const allowedOrigins = [ process.env.FRONTEND ];
+const allowedOrigins = [process.env.FRONTEND];
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -33,8 +34,8 @@ const corsOptions = {
       callback(new Error(`CORS policy error: ${origin} is not allowed.`));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
   maxAge: 3600, // Add this option to specify the maximum age of the CORS configuration
 };
@@ -50,13 +51,19 @@ mongoose
 // Authentication Middleware
 const authenticate = async (req, res, next) => {
   const token = req.cookies.token;
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = await Admin.findById(decoded.adminId);
-    // console.log(req.user)
     next();
   } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Access token expired" });
+    } else {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
   }
 };
 
@@ -107,6 +114,23 @@ const checkPermission = (action) => {
   };
 };
 
+// Helper functions
+const generateAccessToken = (admin) => {
+  return jwt.sign(
+    { adminId: admin._id, role: admin.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" } // short-lived
+  );
+};
+
+const generateRefreshToken = (admin) => {
+  return jwt.sign(
+    { adminId: admin._id },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: "7d" } // long-lived
+  );
+};
+
 // Send verification email
 const transporter = nodemailer.createTransport({
   service: "Gmail",
@@ -145,8 +169,8 @@ const registerSchema = Joi.object({
     "string.max": "Password must not exceed 8 characters",
     "any.required": "Password is required",
   }),
-  confirmPassword: Joi.any().valid(Joi.ref('password')).required().messages({
-    'any.only': 'Passwords do not match',
+  confirmPassword: Joi.any().valid(Joi.ref("password")).required().messages({
+    "any.only": "Passwords do not match",
   }),
 });
 
@@ -194,7 +218,7 @@ const contactSchema = Joi.object({
     "string.empty": "Phone number is required",
     "any.required": "Phone number is required",
   }),
-  company: Joi.string().trim().allow('').optional(),
+  company: Joi.string().trim().allow("").optional(),
   service: Joi.string().required().trim().messages({
     "string.empty": "Service is required",
     "any.required": "Service is required",
@@ -222,9 +246,8 @@ const postSchema = Joi.object({
   content: Joi.string().required(),
   excerpt: Joi.string().required(),
   tag: Joi.array().items(Joi.string().required()).min(1).required(),
-  isTrending: Joi.boolean().default(false)
+  isTrending: Joi.boolean().default(false),
 });
-
 
 // ADMIN AUTHENTICATION
 
@@ -241,7 +264,7 @@ app.post("/api/admin-register", limiter, async (req, res) => {
 
   const { name, email, password } = req.body;
 
-  console.log(req.body)
+  console.log(req.body);
 
   // Name uniqueness check
   const existingName = await Admin.findOne({ name });
@@ -298,7 +321,8 @@ app.post("/api/admin-register", limiter, async (req, res) => {
       } else {
         console.log("Email sent: " + info.response);
         res.status(200).json({
-          message: "Registration successful! Please check your email inbox to verify your account."
+          message:
+            "Registration successful! Please check your email inbox to verify your account.",
         });
       }
     });
@@ -331,21 +355,17 @@ app.post("/api/admin-login", limiter, async (req, res) => {
   try {
     await loginSchema.validateAsync(req.body);
   } catch (error) {
-    return res.status(400).json({
-      message: error.details[0].message,
-    });
+    return res.status(400).json({ message: error.details[0].message });
   }
 
   const { email, password } = req.body;
   const admin = await Admin.findOne({ email });
-  if (!admin) {
+  if (!admin)
     return res.status(400).json({ message: "Invalid Email or Password" });
-  }
 
   const isValidPassword = await bcrypt.compare(password, admin.password);
-  if (!isValidPassword) {
+  if (!isValidPassword)
     return res.status(400).json({ message: "Invalid Email or Password" });
-  }
 
   if (!admin.verified) {
     const verificationToken = jwt.sign(
@@ -360,33 +380,71 @@ app.post("/api/admin-login", limiter, async (req, res) => {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
-      expires: new Date(Date.now() + 3600000), // 1 hour
+      expires: new Date(Date.now() + 3600000),
     });
     return res.status(400).json({ message: "Email not verified" });
   }
 
-  const token = jwt.sign(
-    { adminId: admin._id, role: admin.role },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "1h",
-    }
-  );
+  const accessToken = generateAccessToken(admin);
+  const refreshToken = generateRefreshToken(admin);
 
-  res.cookie("token", token, {
+  res.cookie("token", accessToken, {
     httpOnly: true,
     secure: true,
     sameSite: "strict",
-    expires: new Date(Date.now() + 3600000), // 1 hour
+    // maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 30 * 1000, // 30 seconds
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
   res.status(200).json({ message: "Login Successful" });
+});
+
+app.post("/api/refresh-token", async (req, res) => {
+  const token = req.cookies.refreshToken;
+  if (!token) return res.status(401).json({ message: "Refresh token missing" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const admin = await Admin.findById(decoded.adminId);
+    if (!admin)
+      return res.status(403).json({ message: "Invalid refresh token" });
+
+    const newAccessToken = generateAccessToken(admin);
+
+    res.cookie("token", newAccessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      // maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 30 * 1000, // 30 seconds
+    });
+
+    res
+      .status(200)
+      .json({ message: "Access token refreshed", accessToken: newAccessToken });
+  } catch (err) {
+    return res
+      .status(403)
+      .json({ message: "Invalid or expired refresh token" });
+  }
 });
 
 // Admin Logout End point - Connected
 app.post("/api/admin-logout", limiter, authenticate, (req, res) => {
   try {
     res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+    });
+    res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
@@ -507,66 +565,72 @@ app.get("/api/get-admin-email", async (req, res) => {
 });
 
 // Resend Verification Endpoint - Connected
-app.post("/api/resend-verification", verifyTokenMiddleware, async (req, res) => {
-  try {
-    const admin = await Admin.findById(req.adminId);
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
-    if (admin.verified) {
-      return res.status(400).json({ message: "Email already verified" });
-    }
-
-    const COOLDOWN_SECONDS = 60;
-
-    // Check if cooldown period has passed
-    const now = new Date();
-    if (admin.lastVerificationSent) {
-      const secondsSinceLastSend = (now - admin.lastVerificationSent) / 1000;
-      const remainingTime = Math.ceil(COOLDOWN_SECONDS - secondsSinceLastSend);
-      if (secondsSinceLastSend < COOLDOWN_SECONDS) {
-        return res.status(429).json({
-          message: `Please wait ${remainingTime} seconds before resending verification email.`,
-          cooldown: remainingTime,
-        });
-      }
-    }
-
-    const verifyToken = jwt.sign(
-      { adminId: admin._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: admin.email,
-      subject: "Verify your email",
-      text: `Verify your email by clicking this link: ${process.env.FRONTEND}/admin/verify-email/${verifyToken}`,
-    };
-
+app.post(
+  "/api/resend-verification",
+  verifyTokenMiddleware,
+  async (req, res) => {
     try {
-      const info = await transporter.sendMail(mailOptions);
-      console.log("Email sent: " + info.response);
+      const admin = await Admin.findById(req.adminId);
+      if (!admin) {
+        return res.status(404).json({ message: "Admin not found" });
+      }
 
-      // Save the current time to enforce cooldown
-      admin.lastVerificationSent = now;
-      await admin.save();
+      if (admin.verified) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
 
-      res.status(200).json({ message: "Email Verification sent" });
+      const COOLDOWN_SECONDS = 60;
+
+      // Check if cooldown period has passed
+      const now = new Date();
+      if (admin.lastVerificationSent) {
+        const secondsSinceLastSend = (now - admin.lastVerificationSent) / 1000;
+        const remainingTime = Math.ceil(
+          COOLDOWN_SECONDS - secondsSinceLastSend
+        );
+        if (secondsSinceLastSend < COOLDOWN_SECONDS) {
+          return res.status(429).json({
+            message: `Please wait ${remainingTime} seconds before resending verification email.`,
+            cooldown: remainingTime,
+          });
+        }
+      }
+
+      const verifyToken = jwt.sign(
+        { adminId: admin._id },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: admin.email,
+        subject: "Verify your email",
+        text: `Verify your email by clicking this link: ${process.env.FRONTEND}/admin/verify-email/${verifyToken}`,
+      };
+
+      try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log("Email sent: " + info.response);
+
+        // Save the current time to enforce cooldown
+        admin.lastVerificationSent = now;
+        await admin.save();
+
+        res.status(200).json({ message: "Email Verification sent" });
+      } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Error sending verification email" });
+      }
     } catch (error) {
       console.log(error);
-      res.status(500).json({ message: "Error sending verification email" });
+      res.status(500).json({ message: "Error processing request" });
     }
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error processing request" });
   }
-});
+);
 
 // Contact us send to mail
-app.post('/api/send-email', limiter, async (req, res) => {
+app.post("/api/send-email", limiter, async (req, res) => {
   // Validation check
   try {
     await contactSchema.validateAsync(req.body);
@@ -593,24 +657,23 @@ app.post('/api/send-email', limiter, async (req, res) => {
   };
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
-      console.error('Error sending email:', error);
-      res.status(500).send('Error sending email');
+      console.error("Error sending email:", error);
+      res.status(500).send("Error sending email");
     } else {
-      res.send('Email sent successfully');
+      res.send("Email sent successfully");
     }
   });
 });
 
-app.get('/api/messages', async (req, res) => {
+app.get("/api/messages", async (req, res) => {
   try {
     const messages = await Message.find().sort({ createdAt: -1 });
     res.status(200).json(messages);
   } catch (error) {
     console.error("Error fetching messages:", error);
-    res.status(500).json({ message: 'Error fetching messages' });
+    res.status(500).json({ message: "Error fetching messages" });
   }
 });
-
 
 // Get User Details Endpoint
 app.get("/api/get-user-details", authenticate, async (req, res) => {
@@ -627,11 +690,14 @@ app.get("/api/get-user-details", authenticate, async (req, res) => {
   }
 });
 
-
 // CATEGORY CRUD OPERATION
 
 // Create Category (admin only) - Connected
-app.post( "/api/category", authenticate, checkPermission("create"), async (req, res) => {
+app.post(
+  "/api/category",
+  authenticate,
+  checkPermission("create"),
+  async (req, res) => {
     try {
       await categorySchema.validateAsync(req.body);
     } catch (error) {
@@ -663,18 +729,21 @@ app.post( "/api/category", authenticate, checkPermission("create"), async (req, 
 
 // Get Category (admin and user) - Connected
 app.get("/api/category", async (req, res) => {
-    try {
-      const categories = await Category.find();
-      res.status(200).json(categories);
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Error fetching categories" });
-    }
+  try {
+    const categories = await Category.find();
+    res.status(200).json(categories);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error fetching categories" });
   }
-);
+});
 
 // Delete Category (admin only) - Connected
-app.delete( "/api/category/:id", authenticate, checkPermission("delete"), async (req, res) => {
+app.delete(
+  "/api/category/:id",
+  authenticate,
+  checkPermission("delete"),
+  async (req, res) => {
     try {
       const categoryId = req.params.id;
       const category = await Category.findByIdAndDelete(categoryId);
@@ -690,7 +759,11 @@ app.delete( "/api/category/:id", authenticate, checkPermission("delete"), async 
 );
 
 // Update Category (admin only) - Connected
-app.put( "/api/category/:id", authenticate, checkPermission("update"), async (req, res) => {
+app.put(
+  "/api/category/:id",
+  authenticate,
+  checkPermission("update"),
+  async (req, res) => {
     try {
       await categorySchema.validateAsync(req.body);
     } catch (error) {
@@ -734,49 +807,52 @@ app.put( "/api/category/:id", authenticate, checkPermission("update"), async (re
   }
 );
 
-
-
 // POST CRUD OPERATION
 
 // Create post (admin only) - Connected
-app.post("/api/post", authenticate, checkPermission("create"), async (req, res) => {
-  try {
-    await postSchema.validateAsync(req.body);
-  } catch (error) {
-    return res.status(400).json({ message: error.details[0].message });
+app.post(
+  "/api/post",
+  authenticate,
+  checkPermission("create"),
+  async (req, res) => {
+    try {
+      await postSchema.validateAsync(req.body);
+    } catch (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    }
+
+    try {
+      const categoryId = req.body.category;
+      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      const category = await Category.findById(categoryId);
+      if (!category) {
+        return res.status(400).json({ message: "Category not found" });
+      }
+
+      console.log(req.body);
+
+      delete req.body.postedBy; // Delete postedBy field from request body
+      const postData = new Post(req.body);
+      await postData.save();
+      res.status(201).json({ message: "Post created successfully" });
+    } catch (error) {
+      console.log(error);
+      if (error.name === "ValidationError") {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Error creating post" });
+    }
   }
-
-  try {
-    const categoryId = req.body.category;
-    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-      return res.status(400).json({ message: "Invalid category ID" });
-    }
-
-    const category = await Category.findById(categoryId);
-    if (!category) {
-      return res.status(400).json({ message: "Category not found" });
-    }
-
-    console.log(req.body)
-
-    delete req.body.postedBy; // Delete postedBy field from request body
-    const postData = new Post(req.body);
-    await postData.save();
-    res.status(201).json({ message: "Post created successfully" });
-  } catch (error) {
-    console.log(error);
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: "Error creating post" });
-  }
-});
+);
 
 // View All Posts (admin and user) - Connected
 app.get("/api/post", async (req, res) => {
   try {
     const posts = await Post.find().populate("category");
-    console.log(posts)
+    console.log(posts);
     res.status(200).json(posts);
   } catch (error) {
     console.log(error);
@@ -805,7 +881,10 @@ app.get("/api/post/:id", async (req, res) => {
 });
 
 // Update Post (admin only) - Connected
-app.put( "/api/post/:id", authenticate, checkPermission("update"),
+app.put(
+  "/api/post/:id",
+  authenticate,
+  checkPermission("update"),
   async (req, res) => {
     try {
       const postId = req.params.id;
@@ -838,7 +917,11 @@ app.put( "/api/post/:id", authenticate, checkPermission("update"),
 );
 
 // Delete Post (admin only) - Connected
-app.delete( "/api/post/:id", authenticate, checkPermission("delete"), async (req, res) => {
+app.delete(
+  "/api/post/:id",
+  authenticate,
+  checkPermission("delete"),
+  async (req, res) => {
     try {
       const postId = req.params.id;
       if (!mongoose.Types.ObjectId.isValid(postId)) {
@@ -903,68 +986,6 @@ app.get("/api/posts/search-filter", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // COMMENT AND REPLY FUNCTIONALITY
 
 // Create Comment or Reply (only user) - Connected
@@ -1018,7 +1039,6 @@ app.get("/posts/:postId/comments", async (req, res) => {
     res.status(500).json({ message: "Error getting comments" });
   }
 });
-
 
 // ADMIN CRUD OPERATION
 
