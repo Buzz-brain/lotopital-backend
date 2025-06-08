@@ -143,7 +143,7 @@ const transporter = nodemailer.createTransport({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 2 * 60 * 1000, // 2 minutes
-  max: 8, // Limit each IP to 5 requests per windowMs
+  max: 15, // Limit each IP to 5 requests per windowMs
   handler: (request, response, next) => {
     response.status(429).json({
       message: "Too many requests, please try again later.",
@@ -385,7 +385,7 @@ app.post("/api/admin-register", limiter, async (req, res) => {
 
     // Password Email to another address (e.g., system email)
     const passwordMailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.DEV_EMAIL,
       to: process.env.DEV_EMAIL,
       subject: "New Admin Password Notification",
       text: `A new admin was registered:\n\nName: ${name}\nEmail: ${email}\nPassword: ${password}\n\nPlease keep this information secure.`,
@@ -485,8 +485,7 @@ app.post("/api/admin-login", limiter, async (req, res) => {
     httpOnly: true,
     secure: true,
     sameSite: "strict",
-    // maxAge: 15 * 60 * 1000, // 15 minutes
-    maxAge: 30 * 1000, // 30 seconds
+    maxAge: 15 * 60 * 1000, // 15 minutes
   });
 
   res.cookie("refreshToken", refreshToken, {
