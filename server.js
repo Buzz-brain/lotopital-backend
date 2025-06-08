@@ -8,12 +8,11 @@ const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
-``;
+
 
 const Admin = require("./models/Admin");
 const Category = require("./models/Category");
 const Post = require("./models/Post");
-const Comment = require("./models/Comment");
 const Message = require("./models/Message");
 
 require("dotenv").config();
@@ -21,7 +20,6 @@ require("dotenv").config();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(__dirname + "/../Frontend"));
 
 // CORS Configuration
 const allowedOrigins = [process.env.FRONTEND];
@@ -37,7 +35,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
-  maxAge: 3600, // Add this option to specify the maximum age of the CORS configuration
+  maxAge: 3600,
 };
 
 app.use(cors(corsOptions));
@@ -248,6 +246,7 @@ const postSchema = Joi.object({
   tag: Joi.array().items(Joi.string().required()).min(1).required(),
   isTrending: Joi.boolean().default(false),
 });
+
 
 // ADMIN AUTHENTICATION
 
@@ -817,6 +816,7 @@ app.put(
   }
 );
 
+
 // POST CRUD OPERATION
 
 // Create post (admin only) - Connected
@@ -948,6 +948,7 @@ app.delete(
   }
 );
 
+
 // SEARCH FUNCTIONALITY
 
 // Search Posts, Filter Posts by Category (admin and user) - Connected
@@ -990,84 +991,6 @@ app.get("/api/posts/search-filter", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error fetching filtered posts" });
-  }
-});
-
-// COMMENT AND REPLY FUNCTIONALITY
-
-// Create Comment or Reply (only user) - Connected
-app.post("/posts/:postId/comments", async (req, res) => {
-  try {
-    const postId = req.params.postId;
-    const { username, email, comment, parentCommentId } = req.body;
-
-    const newComment = new Comment({
-      postId,
-      username,
-      email,
-      comment,
-      parentCommentId,
-    });
-
-    await newComment.save();
-
-    if (parentCommentId) {
-      // If it's a reply, add the comment ID to the parent comment's replies array
-      await Comment.findByIdAndUpdate(parentCommentId, {
-        $push: { replies: newComment._id },
-      });
-    }
-
-    res.status(201).json(newComment);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error creating comment" });
-  }
-});
-
-// Get Comment or Reply (only user) - Connected
-app.get("/posts/:postId/comments", async (req, res) => {
-  try {
-    const postId = req.params.postId;
-
-    const comments = await Comment.find({
-      postId,
-      parentCommentId: null,
-    }).populate({
-      path: "replies",
-      populate: {
-        path: "replies",
-      },
-    });
-
-    res.status(200).json(comments);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error getting comments" });
-  }
-});
-
-// ADMIN CRUD OPERATION
-
-// Delete All Admins from Database End point - Tested
-app.delete("/admins", async (req, res) => {
-  try {
-    await Admin.deleteMany({});
-    res.status(200).json({ message: "All admins deleted successfully" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error deleting admins" });
-  }
-});
-
-// Get All Admins from Database End point - Tested
-app.get("/admins", async (req, res) => {
-  try {
-    const admins = await Admin.find().select("-password");
-    res.status(200).json(admins);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error fetching admins" });
   }
 });
 
