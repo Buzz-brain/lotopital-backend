@@ -602,7 +602,6 @@ app.post("/api/reset-password/:token", limiter, async (req, res) => {
   }
 });
 
-
 app.get("/api/get-admin-email", async (req, res) => {
   try {
     const verificationToken = req.cookies.verificationToken;
@@ -810,7 +809,8 @@ app.delete(
       const usedInPost = await Post.findOne({ category: categoryId });
       if (usedInPost) {
         return res.status(400).json({
-          message: "Cannot delete category because it is assigned to one or more posts",
+          message:
+            "Cannot delete category because it is assigned to one or more posts",
         });
       }
 
@@ -897,8 +897,6 @@ app.post(
       if (!category) {
         return res.status(400).json({ message: "Category not found" });
       }
-
-      console.log(req.body);
 
       delete req.body.postedBy; // Delete postedBy field from request body
       const postData = new Post(req.body);
