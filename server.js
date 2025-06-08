@@ -514,8 +514,7 @@ app.post("/api/refresh-token", async (req, res) => {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
-      // maxAge: 15 * 60 * 1000, // 15 minutes
-      maxAge: 30 * 1000, // 30 seconds
+      maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
     res
