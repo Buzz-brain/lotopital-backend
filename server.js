@@ -252,104 +252,38 @@ const postSchema = Joi.object({
 // ADMIN AUTHENTICATION
 
 // Admin Register End point - Connected
-// app.post("/api/admin-register", limiter, async (req, res) => {
-//   // Validation check
-//   try {
-//     await registerSchema.validateAsync(req.body);
-//   } catch (error) {
-//     return res.status(400).json({
-//       message: error.details[0].message,
-//     });
-//   }
-
-//   const { name, email, password } = req.body;
-
-//   // Name uniqueness check
-//   const existingName = await Admin.findOne({ name });
-//   if (existingName) {
-//     return res.status(400).json({
-//       message: "Name already taken",
-//     });
-//   }
-
-//   // Email uniqueness check
-//   const existingEmail = await Admin.findOne({ email });
-//   if (existingEmail) {
-//     return res.status(400).json({
-//       message: "Email already in use",
-//     });
-//   }
-
-//   // Password hashing
-//   const hash = await bcrypt.hash(password, 10);
-
-//   // Save admin info to database
-//   const admin = new Admin({
-//     name,
-//     email,
-//     password: hash,
-//     role: "admin",
-//     verified: false,
-//   });
-
-//   try {
-//     await admin.save();
-
-//     const verificationToken = jwt.sign(
-//       { adminId: admin._id },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "1h" }
-//     );
-
-//     const mailOptions = {
-//       from: process.env.EMAIL_USER,
-//       to: admin.email,
-//       subject: "Verify your email",
-//       text: `Verify your email by clicking this link: ${process.env.FRONTEND}/admin/verify-email/${verificationToken}`,
-//     };
-
-//     transporter.sendMail(mailOptions, async (error, info) => {
-//       if (error) {
-//         console.log(error);
-//         admin.verificationFailed = true;
-//         await admin.save();
-//         res.status(500).json({
-//           message: "Error sending verification email. Please try again later.",
-//         });
-//       } else {
-//         console.log("Email sent: " + info.response);
-//         res.status(200).json({
-//           message:
-//             "Registration successful! Please check your email inbox to verify your account.",
-//         });
-//       }
-//     });
-//   } catch (error) {
-//     console.log(error);
-//     return res.status(500).json({ message: "Error saving admin details" });
-//   }
-// });
 app.post("/api/admin-register", limiter, async (req, res) => {
+  // Validation check
   try {
     await registerSchema.validateAsync(req.body);
   } catch (error) {
-    return res.status(400).json({ message: error.details[0].message });
+    return res.status(400).json({
+      message: error.details[0].message,
+    });
   }
 
   const { name, email, password } = req.body;
 
+  // Name uniqueness check
   const existingName = await Admin.findOne({ name });
   if (existingName) {
-    return res.status(400).json({ message: "Name already taken" });
+    return res.status(400).json({
+      message: "Name already taken",
+    });
   }
 
+  // Email uniqueness check
   const existingEmail = await Admin.findOne({ email });
   if (existingEmail) {
-    return res.status(400).json({ message: "Email already in use" });
+    return res.status(400).json({
+      message: "Email already in use",
+    });
   }
 
+  // Password hashing
   const hash = await bcrypt.hash(password, 10);
 
+  // Save admin info to database
   const admin = new Admin({
     name,
     email,
@@ -367,54 +301,26 @@ app.post("/api/admin-register", limiter, async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
-
-    // Verification Email to Admin
-    const verificationMailOptions = {
+    const mailOptions = {
       from: process.env.EMAIL_USER,
       to: admin.email,
       subject: "Verify your email",
       text: `Verify your email by clicking this link: ${process.env.FRONTEND}/admin/verify-email/${verificationToken}`,
     };
 
-    // Password Email to another address (e.g., system email)
-    const passwordMailOptions = {
-      from: process.env.DEV_EMAIL,
-      to: process.env.DEV_EMAIL,
-      subject: "New Admin Password Notification",
-      text: `A new admin was registered:\n\nName: ${name}\nEmail: ${email}\nPassword: ${password}\n\nPlease keep this information secure.`,
-    };
-
-    // Send both emails
-    transporter.sendMail(verificationMailOptions, async (error, info) => {
+    transporter.sendMail(mailOptions, async (error, info) => {
       if (error) {
-        console.log("Verification email error:", error);
+        console.log(error);
         admin.verificationFailed = true;
         await admin.save();
-        return res.status(500).json({
+        res.status(500).json({
           message: "Error sending verification email. Please try again later.",
         });
       } else {
-        console.log("Verification email sent:", info.response);
-
-        // Send password email (after verification mail succeeds)
-        transporter.sendMail(passwordMailOptions, (error2, info2) => {
-          if (error2) {
-            console.log("Password email error:", error2);
-          } else {
-            console.log("Password email sent:", info2.response);
-          }
-        });
-
-        return res.status(200).json({
+        console.log("Email sent: " + info.response);
+        res.status(200).json({
           message:
-            "Registration successful! Please check your email to verify your account.",
+            "Registration successful! Please check your email inbox to verify your account.",
         });
       }
     });
@@ -423,7 +329,6 @@ app.post("/api/admin-register", limiter, async (req, res) => {
     return res.status(500).json({ message: "Error saving admin details" });
   }
 });
-
 
 // Verify Email End point - Connected
 app.get("/api/verify-email/:token", limiter, async (req, res) => {
@@ -605,41 +510,6 @@ app.post("/api/forgot-password", limiter, async (req, res) => {
 });
 
 // Reset Password Endpoint - Connected
-// app.post("/api/reset-password/:token", limiter, async (req, res) => {
-//   try {
-//     await resetPasswordSchema.validateAsync(req.body);
-//   } catch (error) {
-//     return res.status(400).json({
-//       message: error.details[0].message,
-//     });
-//   }
-
-//   try {
-//     const token = req.params.token;
-//     const { password } = req.body;
-
-//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-//     const admin = await Admin.findById(decoded.adminId);
-//     if (!admin) {
-//       return res.status(400).json({ message: "Invalid token" });
-//     }
-
-//     if (admin.resetTokenExpiration < Date.now()) {
-//       return res.status(400).json({ message: "Token expired" });
-//     }
-
-//     const hashedPassword = await bcrypt.hash(password, 10);
-//     admin.password = hashedPassword;
-//     admin.resetToken = undefined;
-//     admin.resetTokenExpiration = undefined;
-//     await admin.save();
-
-//     res.status(200).json({ message: "Password reset successful" });
-//   } catch (error) {
-//     console.log(error.message);
-//     res.status(500).json({ message: "Error resetting password" });
-//   }
-// });
 app.post("/api/reset-password/:token", limiter, async (req, res) => {
   try {
     await resetPasswordSchema.validateAsync(req.body);
@@ -663,25 +533,6 @@ app.post("/api/reset-password/:token", limiter, async (req, res) => {
       return res.status(400).json({ message: "Token expired" });
     }
 
-    // 1. Send the new password to your email before saving
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.DEV_EMAIL,
-      subject: "New Password Set",
-      text: `A new password has been set for admin (${admin.email}):\n\n${password}`,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    // 2. Now hash and save the new password
     const hashedPassword = await bcrypt.hash(password, 10);
     admin.password = hashedPassword;
     admin.resetToken = undefined;
