@@ -1,6 +1,6 @@
 const express = require("express");
 const app = express();
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -9,7 +9,6 @@ const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
-
 
 const Admin = require("./models/Admin");
 const Category = require("./models/Category");
@@ -51,7 +50,6 @@ mongoose
 const authenticate = async (req, res, next) => {
   const token = req.cookies.token;
   if (!token) {
-    console.log("No token provided")
     return res.status(401).json({ message: "No token provided" });
   }
   try {
@@ -60,10 +58,8 @@ const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
-      console.log(error, "Access token expired")
       return res.status(401).json({ message: "Access token expired" });
     } else {
-      console.log(error, "Unauthorized")
       return res.status(401).json({ message: "Unauthorized", error });
     }
   }
@@ -144,16 +140,14 @@ const transporter = nodemailer.createTransport({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 2 * 60 * 1000, // 2 minutes
-  max: 15, // Limit each IP to 5 requests per windowMs
+  windowMs: 3 * 60 * 1000, // 2 minutes
+  max: 20, // Limit each IP to 5 requests per windowMs
   handler: (request, response, next) => {
     response.status(429).json({
       message: "Too many requests, please try again later.",
     });
   },
 });
-
-app.use(limiter);
 
 // Validation Schemas
 const registerSchema = Joi.object({
@@ -253,7 +247,6 @@ const postSchema = Joi.object({
   isTrending: Joi.boolean().default(false),
 });
 
-
 // ADMIN AUTHENTICATION
 
 // Admin Register End point - Connected
@@ -315,14 +308,13 @@ app.post("/api/admin-register", limiter, async (req, res) => {
 
     transporter.sendMail(mailOptions, async (error, info) => {
       if (error) {
-        console.log(error);
         admin.verificationFailed = true;
         await admin.save();
         res.status(500).json({
           message: "Error sending verification email. Please try again later.",
         });
       } else {
-        console.log("Email sent: " + info.response);
+        // console.log("Email sent: " + info.response);
         res.status(200).json({
           message:
             "Registration successful! Please check your email inbox to verify your account.",
@@ -330,7 +322,6 @@ app.post("/api/admin-register", limiter, async (req, res) => {
       }
     });
   } catch (error) {
-    console.log(error);
     return res.status(500).json({ message: "Error saving admin details" });
   }
 });
@@ -348,7 +339,6 @@ app.get("/api/verify-email/:token", limiter, async (req, res) => {
     await admin.save();
     res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
-    console.log(error.message);
     res.status(400).json({ message: "Invalid or expired token" });
   }
 });
@@ -405,7 +395,6 @@ app.post("/api/admin-login", limiter, async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
-  console.log("Login Successful")
   res.status(200).json({ message: "Login Successful" });
 });
 
@@ -503,14 +492,12 @@ app.post("/api/forgot-password", limiter, async (req, res) => {
     };
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
-        console.log(error);
         res.status(500).json({ message: "Error sending email" });
       } else {
         res.status(200).json({ message: "Password reset email sent" });
       }
     });
   } catch (error) {
-    console.log(error);
     res.status(500).json({ message: "Error processing request" });
   }
 });
@@ -547,7 +534,7 @@ app.post("/api/reset-password/:token", limiter, async (req, res) => {
 
     res.status(200).json({ message: "Password reset successful" });
   } catch (error) {
-    console.log(error.message);
+    // console.log(error.message);
     res.status(500).json({ message: "Error resetting password" });
   }
 });
@@ -561,7 +548,7 @@ app.get("/api/get-admin-email", async (req, res) => {
     }
     res.json({ email: decodedToken.email });
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     res.status(401).json({ message: "Invalid token" });
   }
 });
@@ -613,7 +600,7 @@ app.post(
 
       try {
         const info = await transporter.sendMail(mailOptions);
-        console.log("Email sent: " + info.response);
+        // console.log("Email sent: " + info.response);
 
         // Save the current time to enforce cooldown
         admin.lastVerificationSent = now;
@@ -621,11 +608,11 @@ app.post(
 
         res.status(200).json({ message: "Email Verification sent" });
       } catch (error) {
-        console.log(error);
+        // console.log(error);
         res.status(500).json({ message: "Error sending verification email" });
       }
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ message: "Error processing request" });
     }
   }
@@ -723,7 +710,7 @@ app.post(
       await category.save();
       res.status(201).json({ message: "Category created successfully" });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ message: "Error creating category" });
     }
   }
@@ -735,7 +722,7 @@ app.get("/api/category", async (req, res) => {
     const categories = await Category.find();
     res.status(200).json(categories);
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     res.status(500).json({ message: "Error fetching categories" });
   }
 });
@@ -768,7 +755,7 @@ app.delete(
       await Category.findByIdAndDelete(categoryId);
       res.status(200).json({ message: "Category deleted successfully" });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ message: "Error deleting category" });
     }
   }
@@ -817,12 +804,11 @@ app.put(
         .status(200)
         .json({ message: "Category updated successfully", category });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ message: "Error updating category" });
     }
   }
 );
-
 
 // POST CRUD OPERATION
 
@@ -854,7 +840,7 @@ app.post(
       await postData.save();
       res.status(201).json({ message: "Post created successfully" });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       if (error.name === "ValidationError") {
         return res.status(400).json({ message: error.message });
       }
@@ -869,7 +855,7 @@ app.get("/api/post", async (req, res) => {
     const posts = await Post.find().populate("category");
     res.status(200).json(posts);
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     res.status(500).json({ message: "Error fetching posts" });
   }
 });
@@ -889,7 +875,7 @@ app.get("/api/post/:id", async (req, res) => {
 
     res.status(200).json(postData);
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     res.status(500).json({ message: "Error fetching post" });
   }
 });
@@ -924,7 +910,7 @@ app.put(
       }
       res.status(200).json({ message: "Post updated successfully", postData });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ message: "Error updating post" });
     }
   }
@@ -949,12 +935,11 @@ app.delete(
 
       res.status(200).json({ message: "Post deleted successfully" });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ message: "Error deleting post" });
     }
   }
 );
-
 
 // SEARCH FUNCTIONALITY
 
