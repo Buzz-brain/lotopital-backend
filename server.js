@@ -382,7 +382,7 @@ app.post("/api/admin-login", limiter, async (req, res) => {
     res.cookie("verificationToken", verificationToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
       expires: new Date(Date.now() + 3600000),
     });
     return res.status(400).json({ message: "Email not verified" });
@@ -394,14 +394,14 @@ app.post("/api/admin-login", limiter, async (req, res) => {
   res.cookie("token", accessToken, {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "none",
     maxAge: 15 * 60 * 1000, // 15 minutes
   });
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "none",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
@@ -424,7 +424,7 @@ app.post("/api/refresh-token", async (req, res) => {
     res.cookie("token", newAccessToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
@@ -444,12 +444,12 @@ app.post("/api/admin-logout", limiter, authenticate, (req, res) => {
     res.clearCookie("token", {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
     });
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
     });
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
