@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+app.set('trust proxy', true);
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -137,8 +138,6 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASSWORD,
   },
 });
-
-app.set('trust proxy', true);
 
 // Rate limiting
 const limiter = rateLimit({
