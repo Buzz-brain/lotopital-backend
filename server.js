@@ -20,7 +20,6 @@ require("dotenv").config();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
-app.set('trust proxy', true);
 
 // CORS Configuration
 const allowedOrigins = [process.env.FRONTEND];
@@ -139,6 +138,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+app.set('trust proxy', true);
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 2 * 60 * 1000, // 2 minutes
@@ -149,6 +150,8 @@ const limiter = rateLimit({
     });
   },
 });
+
+app.use(limiter);
 
 // Validation Schemas
 const registerSchema = Joi.object({
