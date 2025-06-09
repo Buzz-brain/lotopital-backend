@@ -51,6 +51,7 @@ mongoose
 const authenticate = async (req, res, next) => {
   const token = req.cookies.token;
   if (!token) {
+    console.log("No token provided")
     return res.status(401).json({ message: "No token provided" });
   }
   try {
@@ -59,9 +60,10 @@ const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
+      console.log(error, "Access token expired")
       return res.status(401).json({ message: "Access token expired" });
     } else {
-      console.log(error)
+      console.log(error, "Unauthorized")
       return res.status(401).json({ message: "Unauthorized", error });
     }
   }
