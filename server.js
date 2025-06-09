@@ -20,6 +20,7 @@ require("dotenv").config();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
+app.set('trust proxy', true);
 
 // CORS Configuration
 const allowedOrigins = [process.env.FRONTEND];
