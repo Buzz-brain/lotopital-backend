@@ -161,9 +161,10 @@ const registerSchema = Joi.object({
     "string.email": "Invalid email format",
     "any.required": "Email is required",
   }),
-  password: Joi.string().required().trim().min(6).messages({
+  password: Joi.string().required().trim().min(6).max(8).messages({
     "string.empty": "Password is required",
     "string.min": "Password must contain at least 6 characters",
+    "string.max": "Password must not exceed 8 characters",
     "any.required": "Password is required",
   }),
   confirmPassword: Joi.any().valid(Joi.ref("password")).required().messages({
@@ -192,9 +193,10 @@ const forgotPasswordSchema = Joi.object({
 });
 
 const resetPasswordSchema = Joi.object({
-  password: Joi.string().required().trim().min(6).messages({
+  password: Joi.string().required().trim().min(6).max(8).messages({
     "string.empty": "Password is required",
     "string.min": "Password must contain at least 6 characters",
+    "string.max": "Password must not exceed 8 characters",
     "any.required": "Password is required",
   }),
 });
