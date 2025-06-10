@@ -26,7 +26,7 @@ const allowedOrigins = [process.env.FRONTEND];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS policy error: ${origin} is not allowed.`));
